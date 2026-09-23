@@ -1,10 +1,25 @@
-# easyql
+# easyqlite
 
-JSON schema → validated SQLite DDL.
+JSON schema → validated SQLite DDL. Install in any Node, Bun, or browser project:
 
+```bash
+npm install easyqlite
 ```
-schema.json → Validator → SQL Generator → valid SQLite SQL
+
+```ts
+import { assertValidSchema, generateSQLite } from "easyqlite";
+
+assertValidSchema(schemaJson);
+const ddl = generateSQLite(schemaJson); // SQLite DDL string, no DB I/O
 ```
+
+The library entry is dependency-free pure functions, so it bundles for
+browsers unchanged. The `easyql` CLI binary ships in the same package.
+
+> Repo name is `easyql`; the published npm package is `easyqlite`
+> (`easyql` was already taken on npm).
+
+## CLI
 
 ## Usage
 
@@ -55,7 +70,7 @@ Output is parent-first multi-row `INSERT`s.
 ## Programmatic use
 
 ```ts
-import { assertValidSchema, generateSQLite } from "easyql/src/mod.ts";
+import { assertValidSchema, generateSQLite } from "easyqlite";
 
 assertValidSchema(schemaJson);
 const ddl = generateSQLite(schemaJson);

@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { helpText, parseArgs } from "./cli.ts";

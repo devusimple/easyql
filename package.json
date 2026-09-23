@@ -1,19 +1,58 @@
 {
-  "name": "easyql",
+  "name": "easyqlite",
   "version": "0.1.0",
-  "private": true,
+  "description": "JSON schema to validated SQLite DDL, migrations, and seed data",
+  "license": "MIT",
   "type": "module",
-  "bin": {
-    "easyql": "./src/index.ts"
+  "main": "./dist/mod.cjs",
+  "module": "./dist/mod.mjs",
+  "types": "./dist/mod.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/mod.d.ts",
+        "default": "./dist/mod.mjs"
+      },
+      "require": {
+        "types": "./dist/mod.d.cts",
+        "default": "./dist/mod.cjs"
+      }
+    },
+    "./package.json": "./package.json"
   },
+  "bin": {
+    "easyql": "./dist/cli.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devusimple/easyql.git"
+  },
+  "keywords": [
+    "sqlite",
+    "ddl",
+    "migrations",
+    "schema",
+    "sql-generator"
+  ],
   "scripts": {
     "start": "bun run src/index.ts",
+    "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "generate": "bun run src/index.ts schema.json"
+    "generate": "bun run src/index.ts schema.json",
+    "prepublishOnly": "bun run build"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@types/node": "^26.6.2",
+    "tsup": "^8.5.1",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   }
