@@ -19,6 +19,7 @@ JSON schema (`schema.json`) → validated SQLite DDL. Pipeline: `schema.json →
 - Published npm name is `easyqlite` (`easyql` is taken); repo/GitHub name stays `easyql`
 - Only `src/index.ts` may import node builtins — everything reachable from `src/mod.ts` must stay runtime-agnostic (Node/Bun/browser); `node scripts/smoke-dist.mjs` enforces this
 - `src/migrate/diff.ts` — `diffSchemas(old, new)` → migration statements + warnings; un-alterable changes rebuild the table (RENAME → CREATE → copy → DROP), cascading to referencing children
+- `src/migrate/runner.ts` — `migrateDatabase` (pure, in `mod.ts`): journal-tracked apply in one txn, `foreign_key_check` or rollback; `connection.ts` is CLI-only (lazy driver, never import from lib code)
 - `src/seed/seed.ts` — `validateSeed` + `generateSeedSql`: self-contained JSON rows → parent-first `INSERT`s
 - SQLite only — no Postgres/MySQL syntax.
 

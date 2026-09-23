@@ -85,7 +85,7 @@ export function createIndexStatement(table: string, index: SchemaIndex): string 
   return `CREATE ${unique}INDEX ${quoteIdent(resolveIndexName(table, index))} ON ${quoteIdent(table)} (${cols});`;
 }
 
-export function generateSQLite(schema: DatabaseSchema): string {
+export function generateStatements(schema: DatabaseSchema): string[] {
   const statements: string[] = [];
 
   for (const table of orderTables(schema)) {
@@ -98,5 +98,9 @@ export function generateSQLite(schema: DatabaseSchema): string {
     }
   }
 
-  return statements.join("\n") + "\n";
+  return statements;
+}
+
+export function generateSQLite(schema: DatabaseSchema): string {
+  return generateStatements(schema).join("\n") + "\n";
 }

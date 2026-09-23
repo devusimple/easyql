@@ -141,7 +141,7 @@ function literal(value: SeedValue): string {
   return typeof value === "string" ? `'${value.replace(/'/g, "''")}'` : String(value);
 }
 
-export function generateSeedSql(schema: DatabaseSchema, data: SeedData): string {
+export function generateSeedStatements(schema: DatabaseSchema, data: SeedData): string[] {
   const statements: string[] = [];
 
   for (const table of orderTables(schema)) {
@@ -161,5 +161,10 @@ export function generateSeedSql(schema: DatabaseSchema, data: SeedData): string 
     );
   }
 
+  return statements;
+}
+
+export function generateSeedSql(schema: DatabaseSchema, data: SeedData): string {
+  const statements = generateSeedStatements(schema, data);
   return statements.join("\n") + (statements.length > 0 ? "\n" : "");
 }

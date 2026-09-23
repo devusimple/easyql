@@ -4,6 +4,7 @@ export type CliOptions =
   | { command: "seed"; schema: string; data: string; output?: string; help: boolean }
   | { command: "init"; dir: string; force: boolean; help: boolean }
   | { command: "validate"; schema: string; data?: string; help: boolean }
+  | { command: "migrate"; schema: string; db: string; seed?: string; baseline: boolean; output?: string; help: boolean }
   | { command: "version"; help: boolean };
 
 const HELP = `easyql — validate a JSON schema and print SQLite DDL
@@ -14,6 +15,8 @@ Usage:
   easyql seed <schema> <data> [-o]  INSERTs from a JSON seed file
   easyql validate <schema> [data]   check schema (and seed) files, quiet on success
   easyql init [dir] [-f]            scaffold schema.json + seed.json
+  easyql migrate <schema> --db <f>  apply schema to a SQLite file (with journal)
+    [--seed <data>] [--baseline] [-o out.sql]
   easyql --version                  print version
 
   input            schema file (default: schema.json)
@@ -28,13 +31,27 @@ export function parseArgs(argv: string[]): CliOptions | { error: string } {
   if (argv[0] === "seed") return parseSeedArgs(argv.slice(1));
   if (argv[0] === "init") return parseInitArgs(argv.slice(1));
   if (argv[0] === "validate") return parseValidateArgs(argv.slice(1));
+  if (argv[0] === "migrate") return parseMigrateArgs(argv.slice(1));
   return parseGenerateArgs(argv);
 }
 
-function parseFlags(argv: string[]): { output?: string; force?: boolean; help: boolean; rest: string[] } | { error: string } {
+interface ParsedFlags {
+  output?: string;
+  force?: boolean;
+  help: boolean;
+  rest: string[];
+  db?: string;
+  seedFile?: string;
+  baseline?: boolean;
+}
+
+function parseFlags(argv: string[]): ParsedFlags | { error: string } {
   let output: string | undefined;
   let force = false;
   let help = false;
+  let db: string | undefined;
+  let seedFile: string | undefined;
+  let baseline = false;
   const rest: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -43,10 +60,20 @@ function parseFlags(argv: string[]): { output?: string; force?: boolean; help: b
       help = true;
     } else if (arg === "-f" || arg === "--force") {
       force = true;
+    } else if (arg === "--baseline") {
+      baseline = true;
     } else if (arg === "-o" || arg === "--output") {
       const next = argv[++i];
       if (!next) return { error: "missing value for -o/--output" };
       output = next;
+    } else if (arg === "--db") {
+      const next = argv[++i];
+      if (!next) return { error: "missing value for --db" };
+      db = next;
+    } else if (arg === "--seed") {
+      const next = argv[++i];
+      if (!next) return { error: "missing value for --seed" };
+      seedFile = next;
     } else if (arg.startsWith("-")) {
       return { error: `unknown flag "${arg}"` };
     } else {
@@ -54,12 +81,22 @@ function parseFlags(argv: string[]): { output?: string; force?: boolean; help: b
     }
   }
 
-  return { output, force, help, rest };
+  return { output, force, help, rest, db, seedFile, baseline };
+}
+
+/** --db/--seed/--baseline belong to `migrate` only. */
+function rejectMigrateOnly(flags: ParsedFlags, command: string): string | null {
+  if (flags.db !== undefined) return `--db only applies to "easyql migrate", not "${command}"`;
+  if (flags.seedFile !== undefined) return `--seed only applies to "easyql migrate", not "${command}"`;
+  if (flags.baseline) return `--baseline only applies to "easyql migrate", not "${command}"`;
+  return null;
 }
 
 function parseGenerateArgs(argv: string[]): CliOptions | { error: string } {
   const flags = parseFlags(argv);
   if ("error" in flags) return flags;
+  const misplaced = rejectMigrateOnly(flags, "generate");
+  if (misplaced) return { error: misplaced };
   if (flags.rest.length > 1) return { error: `unexpected argument "${flags.rest[1]}"` };
   return { command: "generate", input: flags.rest[0] ?? "schema.json", output: flags.output, help: flags.help };
 }
@@ -67,6 +104,8 @@ function parseGenerateArgs(argv: string[]): CliOptions | { error: string } {
 function parseDiffArgs(argv: string[]): CliOptions | { error: string } {
   const flags = parseFlags(argv);
   if ("error" in flags) return flags;
+  const misplaced = rejectMigrateOnly(flags, "diff");
+  if (misplaced) return { error: misplaced };
   if (flags.rest.length < 2) return { error: "diff needs two schemas: easyql diff <old> <new>" };
   if (flags.rest.length > 2) return { error: `unexpected argument "${flags.rest[2]}"` };
   return { command: "diff", old: flags.rest[0], current: flags.rest[1], output: flags.output, help: flags.help };
@@ -75,6 +114,8 @@ function parseDiffArgs(argv: string[]): CliOptions | { error: string } {
 function parseSeedArgs(argv: string[]): CliOptions | { error: string } {
   const flags = parseFlags(argv);
   if ("error" in flags) return flags;
+  const misplaced = rejectMigrateOnly(flags, "seed");
+  if (misplaced) return { error: misplaced };
   if (flags.rest.length < 2) return { error: "seed needs two files: easyql seed <schema> <data>" };
   if (flags.rest.length > 2) return { error: `unexpected argument "${flags.rest[2]}"` };
   return { command: "seed", schema: flags.rest[0], data: flags.rest[1], output: flags.output, help: flags.help };
@@ -83,6 +124,8 @@ function parseSeedArgs(argv: string[]): CliOptions | { error: string } {
 function parseInitArgs(argv: string[]): CliOptions | { error: string } {
   const flags = parseFlags(argv);
   if ("error" in flags) return flags;
+  const misplaced = rejectMigrateOnly(flags, "init");
+  if (misplaced) return { error: misplaced };
   if (flags.rest.length > 1) return { error: `unexpected argument "${flags.rest[1]}"` };
   return { command: "init", dir: flags.rest[0] ?? ".", force: flags.force ?? false, help: flags.help };
 }
@@ -90,9 +133,28 @@ function parseInitArgs(argv: string[]): CliOptions | { error: string } {
 function parseValidateArgs(argv: string[]): CliOptions | { error: string } {
   const flags = parseFlags(argv);
   if ("error" in flags) return flags;
+  const misplaced = rejectMigrateOnly(flags, "validate");
+  if (misplaced) return { error: misplaced };
   if (flags.rest.length < 1) return { error: "validate needs a schema: easyql validate <schema> [data]" };
   if (flags.rest.length > 2) return { error: `unexpected argument "${flags.rest[2]}"` };
   return { command: "validate", schema: flags.rest[0], data: flags.rest[1], help: flags.help };
+}
+
+function parseMigrateArgs(argv: string[]): CliOptions | { error: string } {
+  const flags = parseFlags(argv);
+  if ("error" in flags) return flags;
+  if (flags.rest.length < 1) return { error: "migrate needs a schema: easyql migrate <schema> --db <file>" };
+  if (flags.rest.length > 1) return { error: `unexpected argument "${flags.rest[1]}"` };
+  if (!flags.db) return { error: "migrate needs --db <file>" };
+  return {
+    command: "migrate",
+    schema: flags.rest[0],
+    db: flags.db,
+    seed: flags.seedFile,
+    baseline: flags.baseline ?? false,
+    output: flags.output,
+    help: flags.help,
+  };
 }
 
 export function helpText(): string {

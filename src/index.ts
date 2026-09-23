@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { helpText, parseArgs } from "./cli.ts";
 import { generateSQLite } from "./generator/sqlite.ts";
 import { diffSchemas } from "./migrate/diff.ts";
+import { openDatabase } from "./migrate/connection.ts";
+import { MigrationError, migrateDatabase } from "./migrate/runner.ts";
 import { SCHEMA_TEMPLATE, SEED_TEMPLATE } from "./scaffold.ts";
 import { assertValidSeed, generateSeedSql } from "./seed/seed.ts";
 import { assertValidSchema } from "./schema/validator.ts";
@@ -89,6 +91,49 @@ if (parsed.command === "diff") {
   }
 } else if (parsed.command === "version") {
   process.stdout.write(`easyql ${(pkg as { version: string }).version}\n`);
+} else if (parsed.command === "migrate") {
+  const schema = loadSchema(parsed.schema);
+  let seedData: Parameters<typeof migrateDatabase>[1]["seedData"];
+  if (parsed.seed !== undefined) {
+    const data = loadJson(parsed.seed);
+    try {
+      assertValidSeed(schema, data);
+    } catch (e) {
+      fail((e as Error).message);
+    }
+    seedData = data as Exclude<typeof seedData, undefined>;
+  }
+  let db: ReturnType<typeof openDatabase>;
+  try {
+    db = openDatabase(parsed.db);
+  } catch (e) {
+    fail((e as Error).message);
+  }
+  try {
+    const result = migrateDatabase(db!, {
+      schema,
+      seedData,
+      baseline: parsed.baseline,
+    });
+    for (const warning of result.warnings) {
+      process.stderr.write(`easyql warning: ${warning}\n`);
+    }
+    if (parsed.output && result.applied.length > 0) {
+      writeFileSync(parsed.output, result.applied.join("\n") + "\n");
+    }
+    process.stdout.write(
+      result.status === "up-to-date"
+        ? "already up to date\n"
+        : `${result.status}: applied ${result.applied.length} statement(s)\n`,
+    );
+  } catch (e) {
+    if (e instanceof MigrationError) {
+      fail(`${e.message}\n${e.violations.map((v) => `  ${JSON.stringify(v)}`).join("\n")}`);
+    }
+    fail((e as Error).message);
+  } finally {
+    db!.close();
+  }
 } else {
   emit(generateSQLite(loadSchema(parsed.input)), parsed.output);
 }

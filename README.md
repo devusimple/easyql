@@ -49,6 +49,19 @@ copy shared columns → DROP → recreate indexes, wrapped in
 reference it. Added foreign keys on *new* columns ride along inline via
 `ADD COLUMN ... REFERENCES ...`.
 
+## Apply to a live database
+
+```bash
+bun run src/index.ts migrate schema.json --db app.db [--seed seed.json] [--baseline] [-o applied.sql]
+```
+
+Brings a SQLite file to the schema: fresh databases get full DDL (+ seeds),
+initialized ones get the diff. State is tracked in a `_easyql_migrations`
+journal (content hash + last-applied schema), so re-runs are no-ops.
+Everything applies in one transaction with a final `PRAGMA foreign_key_check`
+— violations roll everything back. `--baseline` adopts an existing database
+without applying anything. Needs Bun or Node.js 22.12+ (`node:sqlite`).
+
 ## Seed data (`seed.json`)
 
 ```bash

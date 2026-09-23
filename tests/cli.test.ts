@@ -46,6 +46,21 @@ describe("parseArgs", () => {
     expect(parseArgs(["--version"])).toEqual({ command: "version", help: false });
   });
 
+  it("parses migrate and rejects misplaced migrate-only flags", () => {
+    expect(parseArgs(["migrate", "schema.json", "--db", "app.db"])).toEqual({
+      command: "migrate",
+      schema: "schema.json",
+      db: "app.db",
+      seed: undefined,
+      baseline: false,
+      output: undefined,
+      help: false,
+    });
+    expect(parseArgs(["migrate", "schema.json"])).toHaveProperty("error");
+    expect(parseArgs(["schema.json", "--db", "app.db"])).toHaveProperty("error");
+    expect(parseArgs(["validate", "schema.json", "--baseline"])).toHaveProperty("error");
+  });
+
   it("rejects unknown flags, missing values, and extra positionals", () => {
     expect(parseArgs(["--frobnicate"])).toHaveProperty("error");
     expect(parseArgs(["-o"])).toHaveProperty("error");

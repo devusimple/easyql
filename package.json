@@ -1,6 +1,6 @@
 {
   "name": "easyqlite",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "JSON schema to validated SQLite DDL, migrations, and seed data",
   "license": "MIT",
   "type": "module",
