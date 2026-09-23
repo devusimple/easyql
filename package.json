@@ -1,0 +1,17 @@
+{
+  "name": "easyql",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "generate": "bun run src/index.ts schema.json"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

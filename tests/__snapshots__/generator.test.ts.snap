@@ -1,0 +1,14 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generateSQLite > emits users before posts with FK + cascade 1`] = `
+"CREATE TABLE "users" (
+  "id" TEXT PRIMARY KEY,
+  "name" TEXT NOT NULL
+);
+CREATE TABLE "posts" (
+  "id" TEXT PRIMARY KEY,
+  "user_id" TEXT NOT NULL,
+  FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE
+);
+"
+`;
