@@ -243,7 +243,15 @@ export function diffSchemas(oldSchema: DatabaseSchema, newSchema: DatabaseSchema
 
   if (rebuildBlocks.length > 0) {
     return {
-      statements: [`PRAGMA foreign_keys=OFF;`, ...statements, ...rebuildBlocks, `PRAGMA foreign_keys=ON;`],
+      // foreign_key_check surfaces violations the rebuild may have
+      // introduced (or exposed) instead of failing later DML mysteriously.
+      statements: [
+        `PRAGMA foreign_keys=OFF;`,
+        ...statements,
+        ...rebuildBlocks,
+        `PRAGMA foreign_keys=ON;`,
+        `PRAGMA foreign_key_check;`,
+      ],
       warnings,
     };
   }

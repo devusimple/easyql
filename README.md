@@ -10,7 +10,11 @@ schema.json → Validator → SQL Generator → valid SQLite SQL
 
 ```bash
 bun install
-bun run src/index.ts [schema.json] [-o out.sql]
+bun run src/index.ts [schema.json] [-o out.sql]   # generate
+bun run src/index.ts diff old.json new.json       # migrate
+bun run src/index.ts seed schema.json seed.json   # seed data
+bun run src/index.ts validate schema.json [seed]  # check, quiet on success
+bun run src/index.ts init [dir]                   # scaffold schema.json + seed.json
 ```
 
 Installed as a dependency, the `easyql` bin is available (`bunx easyql schema.json`).

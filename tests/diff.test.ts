@@ -98,7 +98,7 @@ describe("diffSchemas", () => {
     const { statements, warnings } = diffSchemas(v1, changed);
     expect(warnings).toEqual([]);
     expect(statements[0]).toBe("PRAGMA foreign_keys=OFF;");
-    expect(statements[statements.length - 1]).toBe("PRAGMA foreign_keys=ON;");
+    expect(statements[statements.length - 1]).toBe("PRAGMA foreign_key_check;");
     expect(statements).toContain('ALTER TABLE "users" RENAME TO "_easyql_backup_users";');
     expect(statements.some((s) => s.startsWith('CREATE TABLE "users"'))).toBe(true);
     expect(statements).toContain(

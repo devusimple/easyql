@@ -38,6 +38,14 @@ describe("parseArgs", () => {
     expect(parseArgs(["seed", "only-one.json"])).toHaveProperty("error");
   });
 
+  it("parses init, validate, and --version", () => {
+    expect(parseArgs(["init"])).toEqual({ command: "init", dir: ".", force: false, help: false });
+    expect(parseArgs(["init", "db", "-f"])).toMatchObject({ command: "init", dir: "db", force: true });
+    expect(parseArgs(["validate", "schema.json"])).toMatchObject({ command: "validate" });
+    expect(parseArgs(["validate"])).toHaveProperty("error");
+    expect(parseArgs(["--version"])).toEqual({ command: "version", help: false });
+  });
+
   it("rejects unknown flags, missing values, and extra positionals", () => {
     expect(parseArgs(["--frobnicate"])).toHaveProperty("error");
     expect(parseArgs(["-o"])).toHaveProperty("error");

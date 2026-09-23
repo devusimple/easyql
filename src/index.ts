@@ -1,11 +1,14 @@
 #!/usr/bin/env bun
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { helpText, parseArgs } from "./cli.ts";
 import { generateSQLite } from "./generator/sqlite.ts";
 import { diffSchemas } from "./migrate/diff.ts";
+import { SCHEMA_TEMPLATE, SEED_TEMPLATE } from "./scaffold.ts";
 import { assertValidSeed, generateSeedSql } from "./seed/seed.ts";
 import { assertValidSchema } from "./schema/validator.ts";
 import type { DatabaseSchema } from "./schema/types.ts";
+import pkg from "../package.json";
 
 function fail(message: string): never {
   process.stderr.write(`easyql: ${message}\n`);
@@ -65,6 +68,28 @@ if (parsed.command === "diff") {
     fail((e as Error).message);
   }
   emit(generateSeedSql(schema, data as Parameters<typeof generateSeedSql>[1]), parsed.output);
+} else if (parsed.command === "init") {
+  mkdirSync(parsed.dir, { recursive: true });
+  for (const [name, template] of [["schema.json", SCHEMA_TEMPLATE], ["seed.json", SEED_TEMPLATE]] as const) {
+    const path = join(parsed.dir, name);
+    if (existsSync(path) && !parsed.force) {
+      fail(`"${path}" exists (use -f to overwrite)`);
+    }
+    writeFileSync(path, template);
+    process.stdout.write(`wrote ${path}\n`);
+  }
+} else if (parsed.command === "validate") {
+  const schema = loadSchema(parsed.schema);
+  if (parsed.data !== undefined) {
+    const data = loadJson(parsed.data);
+    try {
+      assertValidSeed(schema, data);
+    } catch (e) {
+      fail((e as Error).message);
+    }
+  }
+} else if (parsed.command === "version") {
+  process.stdout.write(`easyql ${(pkg as { version: string }).version}\n`);
 } else {
   emit(generateSQLite(loadSchema(parsed.input)), parsed.output);
 }

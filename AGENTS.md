@@ -6,6 +6,7 @@ JSON schema (`schema.json`) → validated SQLite DDL. Pipeline: `schema.json →
 ## Commands (bun only)
 - `bun install` — install
 - `bun run src/index.ts [schema.json]` — validate + print DDL (`bun run generate`)
+- `bun run src/index.ts diff|seed|validate|init` — migrate, seed, check, scaffold; `--version` prints version
 - `bunx tsc --noEmit` — typecheck
 - `bunx vitest run` — all tests; `bunx vitest run <file>` — single file
 - release: `git tag vX.Y.Z` — CI verifies, compiles per-OS binaries, attaches to GitHub release
