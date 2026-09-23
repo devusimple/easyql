@@ -27,6 +27,17 @@ describe("parseArgs", () => {
     expect(parseArgs(["diff", "only-one.json"])).toHaveProperty("error");
   });
 
+  it("parses the seed subcommand", () => {
+    expect(parseArgs(["seed", "schema.json", "seed.json"])).toEqual({
+      command: "seed",
+      schema: "schema.json",
+      data: "seed.json",
+      output: undefined,
+      help: false,
+    });
+    expect(parseArgs(["seed", "only-one.json"])).toHaveProperty("error");
+  });
+
   it("rejects unknown flags, missing values, and extra positionals", () => {
     expect(parseArgs(["--frobnicate"])).toHaveProperty("error");
     expect(parseArgs(["-o"])).toHaveProperty("error");

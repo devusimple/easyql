@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { helpText, parseArgs } from "./cli.ts";
 import { generateSQLite } from "./generator/sqlite.ts";
 import { diffSchemas } from "./migrate/diff.ts";
+import { assertValidSeed, generateSeedSql } from "./seed/seed.ts";
 import { assertValidSchema } from "./schema/validator.ts";
 import type { DatabaseSchema } from "./schema/types.ts";
 
@@ -16,19 +17,22 @@ function emit(sql: string, output: string | undefined): void {
   else process.stdout.write(sql);
 }
 
-function loadSchema(path: string): DatabaseSchema {
+function loadJson(path: string): unknown {
   let raw: string;
   try {
     raw = readFileSync(path, "utf8");
   } catch {
     fail(`cannot read "${path}"`);
   }
-  let json: unknown;
   try {
-    json = JSON.parse(raw!);
+    return JSON.parse(raw!);
   } catch (e) {
     fail(`invalid JSON in "${path}": ${(e as Error).message}`);
   }
+}
+
+function loadSchema(path: string): DatabaseSchema {
+  const json = loadJson(path);
   try {
     assertValidSchema(json);
   } catch (e) {
@@ -52,6 +56,15 @@ if (parsed.command === "diff") {
     process.stderr.write(`easyql warning: ${warning}\n`);
   }
   emit(statements.join("\n") + (statements.length > 0 ? "\n" : ""), parsed.output);
+} else if (parsed.command === "seed") {
+  const schema = loadSchema(parsed.schema);
+  const data = loadJson(parsed.data);
+  try {
+    assertValidSeed(schema, data);
+  } catch (e) {
+    fail((e as Error).message);
+  }
+  emit(generateSeedSql(schema, data as Parameters<typeof generateSeedSql>[1]), parsed.output);
 } else {
   emit(generateSQLite(loadSchema(parsed.input)), parsed.output);
 }

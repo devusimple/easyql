@@ -30,6 +30,24 @@ copy shared columns → DROP → recreate indexes, wrapped in
 reference it. Added foreign keys on *new* columns ride along inline via
 `ADD COLUMN ... REFERENCES ...`.
 
+## Seed data (`seed.json`)
+
+```bash
+bun run src/index.ts seed schema.json seed.json [-o seed.sql]
+```
+
+```json
+{
+  "users": [{ "id": "u1", "name": "Ada" }],
+  "posts": [{ "id": "p1", "user_id": "u1" }]
+}
+```
+
+Rows are type-checked against the schema (missing `NOT NULL` columns without
+defaults, wrong types, `null` into `NOT NULL`, blob columns all rejected) and
+foreign keys must resolve within the seed file — seeds are self-contained.
+Output is parent-first multi-row `INSERT`s.
+
 ## Programmatic use
 
 ```ts

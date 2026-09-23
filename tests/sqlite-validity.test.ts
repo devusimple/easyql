@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { generateSQLite } from "../src/generator/sqlite.ts";
 import { diffSchemas } from "../src/migrate/diff.ts";
+import { generateSeedSql } from "../src/seed/seed.ts";
 import { assertValidSchema } from "../src/schema/validator.ts";
 
 // Loaded via require(): Vite's resolver can't handle the `node:sqlite`
@@ -193,6 +194,46 @@ describe("generated DDL runs on real SQLite", () => {
     ).toThrow();
     db.prepare("DELETE FROM users WHERE id = ?").run("u1");
     expect(db.prepare("SELECT id FROM posts").all()).toEqual([]);
+    db.close();
+  });
+
+  it("seeds a fresh database end to end: DDL + INSERTs with FKs on", () => {
+    const db = new DatabaseSync(":memory:");
+    const schema = {
+      users: {
+        columns: [
+          { c_name: "id", c_type: "text", is_primary_key: true },
+          { c_name: "name", c_type: "text", is_nullable: false },
+        ],
+      },
+      posts: {
+        columns: [
+          { c_name: "id", c_type: "text", is_primary_key: true },
+          { c_name: "user_id", c_type: "text", is_nullable: false },
+        ],
+        relations: [
+          {
+            type: "many_to_one" as const,
+            column: "user_id",
+            references: { table: "users", column: "id" },
+            on_delete: "cascade" as const,
+          },
+        ],
+      },
+    };
+    db.exec("PRAGMA foreign_keys = ON;");
+    db.exec(generateSQLite(schema));
+    db.exec(
+      generateSeedSql(schema, {
+        posts: [{ id: "p1", user_id: "u1" }],
+        users: [{ id: "u1", name: "Ada" }],
+      }),
+    );
+
+    const rows = db
+      .prepare("SELECT p.id, u.name FROM posts p JOIN users u ON u.id = p.user_id")
+      .all();
+    expect(rows).toEqual([{ id: "p1", name: "Ada" }]);
     db.close();
   });
 });

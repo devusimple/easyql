@@ -1,0 +1,4 @@
+{
+  "users": [{ "id": "u1", "name": "Ada" }],
+  "posts": [{ "id": "p1", "user_id": "u1" }]
+}

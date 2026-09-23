@@ -15,6 +15,7 @@ JSON schema (`schema.json`) → validated SQLite DDL. Pipeline: `schema.json →
 - `src/generator/sqlite.ts` — pure schema → DDL string, no DB I/O; `orderTables()` emits referenced tables first, throws on FK cycles
 - `src/index.ts` — CLI (validate → generate); `src/mod.ts` — public library entrypoint
 - `src/migrate/diff.ts` — `diffSchemas(old, new)` → migration statements + warnings; un-alterable changes rebuild the table (RENAME → CREATE → copy → DROP), cascading to referencing children
+- `src/seed/seed.ts` — `validateSeed` + `generateSeedSql`: self-contained JSON rows → parent-first `INSERT`s
 - SQLite only — no Postgres/MySQL syntax.
 
 ## Schema contract

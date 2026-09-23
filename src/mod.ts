@@ -27,3 +27,12 @@ export {
 } from "./generator/sqlite.ts";
 export { helpText, parseArgs, type CliOptions } from "./cli.ts";
 export { diffSchemas, type SchemaDiff } from "./migrate/diff.ts";
+export {
+  assertValidSeed,
+  generateSeedSql,
+  validateSeed,
+  type SeedData,
+  type SeedIssue,
+  type SeedRow,
+  type SeedValue,
+} from "./seed/seed.ts";
