@@ -22,9 +22,13 @@ bun run src/index.ts diff old.json new.json [-o migration.sql]
 ```
 
 Emits `CREATE/DROP TABLE`, `ADD/DROP COLUMN`, and `CREATE/DROP INDEX`
-statements. What SQLite `ALTER TABLE` can't do (added/dropped foreign keys,
-changed columns, added primary keys) is reported as a warning on stderr —
-those need a table rebuild.
+statements. Changes SQLite `ALTER TABLE` can't express (altered columns,
+added primary keys, FK changes on existing columns, dropping PK/UNIQUE/
+indexed/FK-targeted columns) rebuild the table instead: RENAME → CREATE →
+copy shared columns → DROP → recreate indexes, wrapped in
+`PRAGMA foreign_keys=OFF/ON`. Rebuilding a parent also rebuilds tables that
+reference it. Added foreign keys on *new* columns ride along inline via
+`ADD COLUMN ... REFERENCES ...`.
 
 ## Programmatic use
 

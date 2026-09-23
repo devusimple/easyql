@@ -140,4 +140,59 @@ describe("generated DDL runs on real SQLite", () => {
     ).toThrow();
     db.close();
   });
+
+  it("rebuilds a table on real SQLite, preserving data and FKs", () => {
+    const db = new DatabaseSync(":memory:");
+    const before = {
+      users: {
+        columns: [
+          { c_name: "id", c_type: "text", is_primary_key: true },
+          { c_name: "name", c_type: "text", is_nullable: false },
+        ],
+      },
+      posts: {
+        columns: [
+          { c_name: "id", c_type: "text", is_primary_key: true },
+          { c_name: "user_id", c_type: "text", is_nullable: false },
+        ],
+        relations: [
+          {
+            type: "many_to_one" as const,
+            column: "user_id",
+            references: { table: "users", column: "id" },
+            on_delete: "cascade" as const,
+          },
+        ],
+      },
+    };
+    db.exec("PRAGMA foreign_keys = ON;");
+    db.exec(generateSQLite(before));
+    db.prepare("INSERT INTO users (id, name) VALUES (?, ?)").run("u1", "Ada");
+    db.prepare("INSERT INTO posts (id, user_id) VALUES (?, ?)").run("p1", "u1");
+
+    // Loosen posts.user_id to nullable: needs a rebuild of posts.
+    const after = {
+      ...before,
+      posts: {
+        ...before.posts,
+        columns: [
+          { c_name: "id", c_type: "text", is_primary_key: true },
+          { c_name: "user_id", c_type: "text", is_nullable: true },
+        ],
+      },
+    };
+    const { statements, warnings } = diffSchemas(before, after);
+    expect(warnings).toEqual([]);
+    db.exec(statements.join("\n"));
+
+    // Data survived, FK still enforced, cascade still works.
+    const rows = db.prepare("SELECT id, user_id FROM posts").all();
+    expect(rows).toEqual([{ id: "p1", user_id: "u1" }]);
+    expect(() =>
+      db.prepare("INSERT INTO posts (id, user_id) VALUES (?, ?)").run("p2", "ghost"),
+    ).toThrow();
+    db.prepare("DELETE FROM users WHERE id = ?").run("u1");
+    expect(db.prepare("SELECT id FROM posts").all()).toEqual([]);
+    db.close();
+  });
 });

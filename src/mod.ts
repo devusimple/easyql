@@ -22,6 +22,7 @@ export {
   generateSQLite,
   orderTables,
   quoteIdent,
+  referencesClause,
   resolveIndexName,
 } from "./generator/sqlite.ts";
 export { helpText, parseArgs, type CliOptions } from "./cli.ts";

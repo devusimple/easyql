@@ -1,4 +1,4 @@
-import type { DatabaseSchema, SchemaColumn, SchemaIndex, SchemaTable } from "../schema/types.ts";
+import type { DatabaseSchema, SchemaColumn, SchemaIndex, SchemaRelation, SchemaTable } from "../schema/types.ts";
 
 export function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
@@ -15,6 +15,10 @@ function defaultSql(value: string | number): string {
 function onDeleteSql(action: string | undefined): string {
   if (!action) return "";
   return ` ON DELETE ${action.toUpperCase()}`;
+}
+
+export function referencesClause(rel: SchemaRelation): string {
+  return ` REFERENCES ${quoteIdent(rel.references.table)}(${quoteIdent(rel.references.column)})${onDeleteSql(rel.on_delete)}`;
 }
 
 /** Order tables so referenced tables are created first. Throws on cycles. */

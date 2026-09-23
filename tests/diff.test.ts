@@ -53,17 +53,62 @@ describe("diffSchemas", () => {
     expect(statements.findIndex((s) => s.startsWith("DROP TABLE"))).toBe(0);
   });
 
-  it("warns instead of emitting what SQLite ALTER TABLE can't do", () => {
+  it("inlines an added foreign key on a new column — no rebuild", () => {
+    const old: DatabaseSchema = {
+      users: v1.users,
+      posts: {
+        columns: [{ c_name: "id", c_type: "text", is_primary_key: true }],
+      },
+    };
+    const next: DatabaseSchema = {
+      users: v1.users,
+      posts: {
+        columns: [
+          { c_name: "id", c_type: "text", is_primary_key: true },
+          { c_name: "user_id", c_type: "text", is_nullable: false },
+        ],
+        relations: [
+          {
+            type: "many_to_one",
+            column: "user_id",
+            references: { table: "users", column: "id" },
+            on_delete: "cascade",
+          },
+        ],
+      },
+    };
+    const { statements, warnings } = diffSchemas(old, next);
+    expect(warnings).toEqual([]);
+    expect(statements).toEqual([
+      'ALTER TABLE "posts" ADD COLUMN "user_id" TEXT NOT NULL REFERENCES "users"("id") ON DELETE CASCADE;',
+    ]);
+  });
+
+  it("rebuilds a table whose column changed, preserving shared data", () => {
     const changed: DatabaseSchema = {
       users: {
         columns: [
           { c_name: "id", c_type: "text", is_primary_key: true },
-          // NOT NULL removed: needs a rebuild
+          // NOT NULL removed: SQLite can't ALTER a column
           { c_name: "name", c_type: "text" },
         ],
       },
+      legacy: v1.legacy,
     };
-    const withFk: DatabaseSchema = {
+    const { statements, warnings } = diffSchemas(v1, changed);
+    expect(warnings).toEqual([]);
+    expect(statements[0]).toBe("PRAGMA foreign_keys=OFF;");
+    expect(statements[statements.length - 1]).toBe("PRAGMA foreign_keys=ON;");
+    expect(statements).toContain('ALTER TABLE "users" RENAME TO "_easyql_backup_users";');
+    expect(statements.some((s) => s.startsWith('CREATE TABLE "users"'))).toBe(true);
+    expect(statements).toContain(
+      'INSERT INTO "users" ("id", "name") SELECT "id", "name" FROM "_easyql_backup_users";',
+    );
+    expect(statements).toContain('DROP TABLE "_easyql_backup_users";');
+  });
+
+  it("rebuilds for added/dropped FKs on existing columns and added PKs", () => {
+    const base: DatabaseSchema = {
       users: v1.users,
       posts: {
         columns: [
@@ -80,11 +125,79 @@ describe("diffSchemas", () => {
         ],
       },
     };
-    expect(diffSchemas(v1, changed).warnings).toHaveLength(1);
-    // Only legit statement left: `changed` drops the legacy table.
-    expect(diffSchemas(v1, changed).statements).toEqual(['DROP TABLE "legacy";']);
-    // posts is a new table: created whole, no FK warning for it
-    expect(diffSchemas(v1, withFk).warnings).toEqual([]);
+    const noFk: DatabaseSchema = {
+      users: v1.users,
+      posts: {
+        columns: [
+          { c_name: "id", c_type: "text", is_primary_key: true },
+          { c_name: "user_id", c_type: "text" },
+        ],
+      },
+    };
+    // Dropped FK, column survives → rebuild (SQLite can't DROP CONSTRAINT).
+    expect(diffSchemas(base, noFk).warnings).toEqual([]);
+    expect(diffSchemas(base, noFk).statements.some((s) => s.includes("RENAME TO"))).toBe(true);
+    // And back: added FK on an existing column → rebuild too.
+    expect(diffSchemas(noFk, base).statements.some((s) => s.includes("RENAME TO"))).toBe(true);
+
+    const addedPk: DatabaseSchema = {
+      solo: {
+        columns: [
+          { c_name: "id", c_type: "integer", is_primary_key: true },
+          { c_name: "code", c_type: "text", is_primary_key: true },
+        ],
+      },
+    };
+    const before: DatabaseSchema = {
+      solo: {
+        columns: [
+          { c_name: "id", c_type: "integer", is_primary_key: true },
+          { c_name: "code", c_type: "text" },
+        ],
+      },
+    };
+    const pkDiff = diffSchemas(before, addedPk);
+    expect(pkDiff.warnings).toEqual([]);
+    expect(pkDiff.statements.some((s) => s.includes("_easyql_backup_solo"))).toBe(true);
+  });
+
+  it("rebuilds children when a parent is rebuilt", () => {
+    const parent: DatabaseSchema = {
+      users: v1.users,
+      posts: {
+        columns: [
+          { c_name: "id", c_type: "text", is_primary_key: true },
+          { c_name: "user_id", c_type: "text", is_nullable: false },
+        ],
+        relations: [
+          {
+            type: "many_to_one",
+            column: "user_id",
+            references: { table: "users", column: "id" },
+            on_delete: "cascade",
+          },
+        ],
+      },
+    };
+    // Changing users.id forces a users rebuild; posts must rebuild too or
+    // its REFERENCES would dangle at the backup name.
+    const changedPk: DatabaseSchema = {
+      users: {
+        columns: [
+          { c_name: "id", c_type: "integer", is_primary_key: true },
+          { c_name: "name", c_type: "text", is_nullable: false },
+        ],
+      },
+      posts: parent.posts,
+    };
+    const { statements, warnings } = diffSchemas(parent, changedPk);
+    expect(warnings).toEqual([]);
+    expect(statements).toContain('ALTER TABLE "users" RENAME TO "_easyql_backup_users";');
+    expect(statements).toContain('ALTER TABLE "posts" RENAME TO "_easyql_backup_posts";');
+    // Parent block precedes the child block.
+    expect(
+      statements.findIndex((s) => s.includes("_easyql_backup_users")),
+    ).toBeLessThan(statements.findIndex((s) => s.includes("_easyql_backup_posts")));
   });
 
   it("recreates a changed index via DROP + CREATE", () => {
