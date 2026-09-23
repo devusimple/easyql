@@ -13,6 +13,17 @@ bun install
 bun run src/index.ts [schema.json] [-o out.sql]
 ```
 
+Installed as a dependency, the `easyql` bin is available (`bunx easyql schema.json`).
+
+## Programmatic use
+
+```ts
+import { assertValidSchema, generateSQLite } from "easyql/src/mod.ts";
+
+assertValidSchema(schemaJson);
+const ddl = generateSQLite(schemaJson);
+```
+
 ## Schema shape (`schema.json`)
 
 ```json

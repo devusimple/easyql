@@ -12,7 +12,7 @@ JSON schema (`schema.json`) → validated SQLite DDL. Pipeline: `schema.json →
 ## Architecture
 - `src/schema/types.ts` — schema shape source of truth; `src/schema/validator.ts` — rejects bad refs/types before generation
 - `src/generator/sqlite.ts` — pure schema → DDL string, no DB I/O; `orderTables()` emits referenced tables first, throws on FK cycles
-- `src/index.ts` — composes validate → generate; `schema.json` is the example input
+- `src/index.ts` — CLI (validate → generate); `src/mod.ts` — public library entrypoint
 - SQLite only — no Postgres/MySQL syntax.
 
 ## Schema contract
