@@ -5,6 +5,9 @@ export interface SchemaColumn {
   c_type: string;
   is_primary_key?: boolean;
   is_nullable?: boolean;
+  is_unique?: boolean;
+  /** Column DEFAULT: string or number literal. */
+  default?: string | number;
 }
 
 export type RelationType = "many_to_one";

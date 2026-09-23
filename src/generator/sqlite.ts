@@ -8,6 +8,10 @@ function sqlType(cType: string): string {
   return cType.toUpperCase();
 }
 
+function defaultSql(value: string | number): string {
+  return typeof value === "string" ? `'${value.replace(/'/g, "''")}'` : String(value);
+}
+
 function onDeleteSql(action: string | undefined): string {
   if (!action) return "";
   return ` ON DELETE ${action.toUpperCase()}`;
@@ -50,6 +54,8 @@ export function generateSQLite(schema: DatabaseSchema): string {
       let line = `  ${quoteIdent(col.c_name)} ${sqlType(col.c_type)}`;
       if (inlinePk && col.is_primary_key) line += " PRIMARY KEY";
       if (!nullable && !(inlinePk && col.is_primary_key)) line += " NOT NULL";
+      if (col.is_unique) line += " UNIQUE";
+      if (col.default !== undefined) line += ` DEFAULT ${defaultSql(col.default)}`;
       return line;
     });
 

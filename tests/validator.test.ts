@@ -49,15 +49,19 @@ describe("validateSchema", () => {
     expect(paths).toContain("posts.relations[0].on_delete");
   });
 
-  it("rejects nullable primary keys and duplicate columns", () => {
+  it("rejects nullable primary keys, duplicate columns, and bad defaults", () => {
     const issues = validateSchema({
       t: {
         columns: [
           { c_name: "id", c_type: "text", is_primary_key: true, is_nullable: true },
           { c_name: "id", c_type: "text" },
+          { c_name: "nick", c_type: "text", is_unique: "yes", default: { odd: true } },
         ],
       },
     });
-    expect(issues.length).toBeGreaterThanOrEqual(2);
+    const paths = issues.map((i) => i.path);
+    expect(paths).toContain("t.columns[2].is_unique");
+    expect(paths).toContain("t.columns[2].default");
+    expect(issues.length).toBeGreaterThanOrEqual(4);
   });
 });

@@ -17,7 +17,7 @@ JSON schema (`schema.json`) → validated SQLite DDL. Pipeline: `schema.json →
 
 ## Schema contract
 - Top level: `{ "<table>": { columns: [...], relations?: [...] } }`; `c_type` in `text|integer|real|blob|numeric`
-- Column: `{ c_name, c_type, is_primary_key?, is_nullable? }`; default `is_nullable: true`; PK implies `NOT NULL`
+- Column: `{ c_name, c_type, is_primary_key?, is_nullable?, is_unique?, default? }`; default `is_nullable: true`; PK implies `NOT NULL`; `default` is a string/number literal
 - Relation (`many_to_one` only): `{ column, references: { table, column }, on_delete? }` → `FOREIGN KEY … ON DELETE …`; `on_delete` in `cascade|set null|set default|restrict|no action`
 
 ## SQLite gotchas

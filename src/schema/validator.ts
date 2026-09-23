@@ -79,10 +79,14 @@ export function validateSchema(input: unknown): ValidationIssue[] {
         });
       }
 
-      for (const flag of ["is_primary_key", "is_nullable"] as const) {
+      for (const flag of ["is_primary_key", "is_nullable", "is_unique"] as const) {
         if (col[flag] !== undefined && typeof col[flag] !== "boolean") {
           issues.push({ path: `${colPath}.${flag}`, message: `${flag} must be a boolean` });
         }
+      }
+
+      if (col.default !== undefined && typeof col.default !== "string" && typeof col.default !== "number") {
+        issues.push({ path: `${colPath}.default`, message: "default must be a string or number" });
       }
 
       if (col.is_primary_key === true && col.is_nullable === true) {

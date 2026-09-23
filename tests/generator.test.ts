@@ -32,4 +32,21 @@ describe("generateSQLite", () => {
     );
     expect(sql).toMatchSnapshot();
   });
+
+  it("renders UNIQUE and DEFAULT (strings escaped, numbers bare)", () => {
+    const sql = generateSQLite({
+      users: {
+        columns: [
+          { c_name: "id", c_type: "integer", is_primary_key: true },
+          { c_name: "email", c_type: "text", is_nullable: false, is_unique: true },
+          { c_name: "nick", c_type: "text", default: "o'brien" },
+          { c_name: "score", c_type: "integer", default: 0 },
+        ],
+      },
+    });
+
+    expect(sql).toContain('"email" TEXT NOT NULL UNIQUE');
+    expect(sql).toContain(`"nick" TEXT DEFAULT 'o''brien'`);
+    expect(sql).toContain('"score" INTEGER DEFAULT 0');
+  });
 });
