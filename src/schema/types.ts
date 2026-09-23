@@ -32,6 +32,15 @@ export interface SchemaRelation {
 export interface SchemaTable {
   columns: SchemaColumn[];
   relations?: SchemaRelation[];
+  indexes?: SchemaIndex[];
+}
+
+export interface SchemaIndex {
+  /** Indexed columns. Multiple columns = composite index (unique = composite UNIQUE). */
+  columns: string[];
+  unique?: boolean;
+  /** Defaults to idx_<table>_<col1>_<col2>. */
+  name?: string;
 }
 
 export type DatabaseSchema = Record<string, SchemaTable>;

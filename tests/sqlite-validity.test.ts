@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { generateSQLite } from "../src/generator/sqlite.ts";
+import { diffSchemas } from "../src/migrate/diff.ts";
 import { assertValidSchema } from "../src/schema/validator.ts";
 
 // Loaded via require(): Vite's resolver can't handle the `node:sqlite`
@@ -66,6 +67,77 @@ describe("generated DDL runs on real SQLite", () => {
       nick: string;
     };
     expect(row.nick).toBe("anon");
+    db.close();
+  });
+
+  it("applies a migration diff to a real database", () => {
+    const db = new DatabaseSync(":memory:");
+    db.exec(
+      generateSQLite({
+        users: {
+          columns: [
+            { c_name: "id", c_type: "integer", is_primary_key: true },
+            { c_name: "name", c_type: "text", is_nullable: false },
+          ],
+        },
+      }),
+    );
+
+    const { statements, warnings } = diffSchemas(
+      {
+        users: {
+          columns: [
+            { c_name: "id", c_type: "integer", is_primary_key: true },
+            { c_name: "name", c_type: "text", is_nullable: false },
+          ],
+        },
+      },
+      {
+        users: {
+          columns: [
+            { c_name: "id", c_type: "integer", is_primary_key: true },
+            { c_name: "name", c_type: "text", is_nullable: false },
+            { c_name: "email", c_type: "text", is_unique: true },
+          ],
+          indexes: [{ columns: ["email"] }],
+        },
+      },
+    );
+    expect(warnings).toEqual([]);
+    db.exec(statements.join("\n"));
+
+    db.prepare("INSERT INTO users (name, email) VALUES (?, ?)").run("Ada", "a@x.io");
+    const row = db.prepare("SELECT email FROM users WHERE name = ?").get("Ada") as {
+      email: string;
+    };
+    expect(row.email).toBe("a@x.io");
+    // Uniqueness survived the migration via its own index.
+    expect(() =>
+      db.prepare("INSERT INTO users (name, email) VALUES (?, ?)").run("Bo", "a@x.io"),
+    ).toThrow();
+    db.close();
+  });
+
+  it("enforces composite UNIQUE indexes", () => {
+    const db = new DatabaseSync(":memory:");
+    db.exec(
+      generateSQLite({
+        posts: {
+          columns: [
+            { c_name: "id", c_type: "integer", is_primary_key: true },
+            { c_name: "user_id", c_type: "text", is_nullable: false },
+            { c_name: "slug", c_type: "text", is_nullable: false },
+          ],
+          indexes: [{ columns: ["user_id", "slug"], unique: true }],
+        },
+      }),
+    );
+
+    db.prepare("INSERT INTO posts (user_id, slug) VALUES (?, ?)").run("u1", "hello");
+    db.prepare("INSERT INTO posts (user_id, slug) VALUES (?, ?)").run("u2", "hello");
+    expect(() =>
+      db.prepare("INSERT INTO posts (user_id, slug) VALUES (?, ?)").run("u1", "hello"),
+    ).toThrow();
     db.close();
   });
 });

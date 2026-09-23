@@ -49,6 +49,27 @@ describe("validateSchema", () => {
     expect(paths).toContain("posts.relations[0].on_delete");
   });
 
+  it("rejects bad indexes: unknown columns, empty lists, duplicate names", () => {
+    const issues = validateSchema({
+      a: {
+        columns: [{ c_name: "x", c_type: "text" }],
+        indexes: [
+          { columns: [] },
+          { columns: ["nope"] },
+          { columns: ["x"], name: "shared" },
+        ],
+      },
+      b: {
+        columns: [{ c_name: "y", c_type: "text" }],
+        indexes: [{ columns: ["y"], name: "shared" }],
+      },
+    });
+    const paths = issues.map((i) => i.path);
+    expect(paths).toContain("a.indexes[0].columns");
+    expect(paths).toContain("a.indexes[1].columns");
+    expect(paths).toContain("b.indexes[0]");
+  });
+
   it("rejects nullable primary keys, duplicate columns, and bad defaults", () => {
     const issues = validateSchema({
       t: {

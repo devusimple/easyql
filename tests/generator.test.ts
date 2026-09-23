@@ -49,4 +49,29 @@ describe("generateSQLite", () => {
     expect(sql).toContain(`"nick" TEXT DEFAULT 'o''brien'`);
     expect(sql).toContain('"score" INTEGER DEFAULT 0');
   });
+
+  it("emits CREATE INDEX after tables, with auto names and composite UNIQUE", () => {
+    const sql = generateSQLite({
+      posts: {
+        columns: [
+          { c_name: "id", c_type: "text", is_primary_key: true },
+          { c_name: "user_id", c_type: "text", is_nullable: false },
+          { c_name: "slug", c_type: "text", is_nullable: false },
+        ],
+        indexes: [
+          { columns: ["user_id"] },
+          { columns: ["user_id", "slug"], unique: true, name: "uq_posts_user_slug" },
+        ],
+      },
+    });
+
+    expect(sql).toContain(
+      'CREATE INDEX "idx_posts_user_id" ON "posts" ("user_id");',
+    );
+    expect(sql).toContain(
+      'CREATE UNIQUE INDEX "uq_posts_user_slug" ON "posts" ("user_id", "slug");',
+    );
+    // Tables first, indexes last.
+    expect(sql.indexOf("CREATE TABLE")).toBeLessThan(sql.indexOf("CREATE INDEX"));
+  });
 });

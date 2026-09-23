@@ -6,6 +6,7 @@ export type {
   OnDeleteAction,
   RelationType,
   SchemaColumn,
+  SchemaIndex,
   SchemaRelation,
   SchemaTable,
 } from "./schema/types.ts";
@@ -14,5 +15,14 @@ export {
   validateSchema,
   type ValidationIssue,
 } from "./schema/validator.ts";
-export { generateSQLite, orderTables } from "./generator/sqlite.ts";
+export {
+  columnDef,
+  createIndexStatement,
+  createTableStatement,
+  generateSQLite,
+  orderTables,
+  quoteIdent,
+  resolveIndexName,
+} from "./generator/sqlite.ts";
 export { helpText, parseArgs, type CliOptions } from "./cli.ts";
+export { diffSchemas, type SchemaDiff } from "./migrate/diff.ts";

@@ -1,6 +1,6 @@
-import type { DatabaseSchema } from "../schema/types.ts";
+import type { DatabaseSchema, SchemaColumn, SchemaIndex, SchemaTable } from "../schema/types.ts";
 
-function quoteIdent(name: string): string {
+export function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
@@ -41,35 +41,57 @@ export function orderTables(schema: DatabaseSchema): string[] {
   return result;
 }
 
+export function columnDef(col: SchemaColumn, inlinePk: boolean): string {
+  const nullable = col.is_primary_key ? false : (col.is_nullable ?? true);
+  let line = `${quoteIdent(col.c_name)} ${sqlType(col.c_type)}`;
+  if (inlinePk && col.is_primary_key) line += " PRIMARY KEY";
+  if (!nullable && !(inlinePk && col.is_primary_key)) line += " NOT NULL";
+  if (col.is_unique) line += " UNIQUE";
+  if (col.default !== undefined) line += ` DEFAULT ${defaultSql(col.default)}`;
+  return line;
+}
+
+export function createTableStatement(table: string, def: SchemaTable): string {
+  const pkCols = def.columns.filter((c) => c.is_primary_key).map((c) => c.c_name);
+  const inlinePk = pkCols.length === 1;
+
+  const lines: string[] = def.columns.map((col) => `  ${columnDef(col, inlinePk)}`);
+
+  if (pkCols.length > 1) {
+    lines.push(`  PRIMARY KEY (${pkCols.map(quoteIdent).join(", ")})`);
+  }
+
+  for (const rel of def.relations ?? []) {
+    lines.push(
+      `  FOREIGN KEY (${quoteIdent(rel.column)}) REFERENCES ${quoteIdent(rel.references.table)}(${quoteIdent(rel.references.column)})${onDeleteSql(rel.on_delete)}`,
+    );
+  }
+
+  return `CREATE TABLE ${quoteIdent(table)} (\n${lines.join(",\n")}\n);`;
+}
+
+/** Index names live in one SQLite-global namespace; the default keeps them unique. */
+export function resolveIndexName(table: string, index: SchemaIndex): string {
+  return index.name ?? `idx_${table}_${index.columns.join("_")}`;
+}
+
+export function createIndexStatement(table: string, index: SchemaIndex): string {
+  const unique = index.unique ? "UNIQUE " : "";
+  const cols = index.columns.map(quoteIdent).join(", ");
+  return `CREATE ${unique}INDEX ${quoteIdent(resolveIndexName(table, index))} ON ${quoteIdent(table)} (${cols});`;
+}
+
 export function generateSQLite(schema: DatabaseSchema): string {
   const statements: string[] = [];
 
   for (const table of orderTables(schema)) {
-    const def = schema[table];
-    const pkCols = def.columns.filter((c) => c.is_primary_key).map((c) => c.c_name);
-    const inlinePk = pkCols.length === 1;
-
-    const lines: string[] = def.columns.map((col) => {
-      const nullable = col.is_primary_key ? false : (col.is_nullable ?? true);
-      let line = `  ${quoteIdent(col.c_name)} ${sqlType(col.c_type)}`;
-      if (inlinePk && col.is_primary_key) line += " PRIMARY KEY";
-      if (!nullable && !(inlinePk && col.is_primary_key)) line += " NOT NULL";
-      if (col.is_unique) line += " UNIQUE";
-      if (col.default !== undefined) line += ` DEFAULT ${defaultSql(col.default)}`;
-      return line;
-    });
-
-    if (pkCols.length > 1) {
-      lines.push(`  PRIMARY KEY (${pkCols.map(quoteIdent).join(", ")})`);
+    statements.push(createTableStatement(table, schema[table]));
+  }
+  // Indexes after all tables: a table must exist before it can be indexed.
+  for (const table of orderTables(schema)) {
+    for (const index of schema[table].indexes ?? []) {
+      statements.push(createIndexStatement(table, index));
     }
-
-    for (const rel of def.relations ?? []) {
-      lines.push(
-        `  FOREIGN KEY (${quoteIdent(rel.column)}) REFERENCES ${quoteIdent(rel.references.table)}(${quoteIdent(rel.references.column)})${onDeleteSql(rel.on_delete)}`,
-      );
-    }
-
-    statements.push(`CREATE TABLE ${quoteIdent(table)} (\n${lines.join(",\n")}\n);`);
   }
 
   return statements.join("\n") + "\n";

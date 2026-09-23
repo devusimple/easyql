@@ -15,6 +15,17 @@ bun run src/index.ts [schema.json] [-o out.sql]
 
 Installed as a dependency, the `easyql` bin is available (`bunx easyql schema.json`).
 
+## Migrations
+
+```bash
+bun run src/index.ts diff old.json new.json [-o migration.sql]
+```
+
+Emits `CREATE/DROP TABLE`, `ADD/DROP COLUMN`, and `CREATE/DROP INDEX`
+statements. What SQLite `ALTER TABLE` can't do (added/dropped foreign keys,
+changed columns, added primary keys) is reported as a warning on stderr —
+those need a table rebuild.
+
 ## Programmatic use
 
 ```ts
@@ -56,6 +67,9 @@ const ddl = generateSQLite(schemaJson);
 - `is_nullable` defaults to `true`; primary keys are always `NOT NULL`
 - `default`: string or number literal
 - relations: `many_to_one` only; `on_delete`: `cascade | set null | set default | restrict | no action`
+- `indexes`: `{ columns, unique?, name? }` → emitted as `CREATE [UNIQUE] INDEX`
+  after all tables; default name `idx_<table>_<cols>` (composite columns =
+  composite UNIQUE)
 
 The validator rejects unknown table/column references, bad types, nullable
 primary keys, and bad `on_delete` values before any SQL is generated.
@@ -72,3 +86,10 @@ primary keys, and bad `on_delete` values before any SQL is generated.
 bunx tsc --noEmit   # typecheck
 bunx vitest run     # tests (incl. executing generated DDL on real SQLite)
 ```
+
+## Releases
+
+Push a tag (`git tag v0.1.0 && git push origin v0.1.0`) — CI verifies,
+compiles a standalone binary per OS via `bun build --compile`, and attaches
+them to the GitHub release. The npm package stays private; binaries are the
+distribution.

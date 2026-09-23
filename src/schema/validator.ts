@@ -1,4 +1,5 @@
 import type { DatabaseSchema } from "./types.ts";
+import { resolveIndexName } from "../generator/sqlite.ts";
 
 const VALID_COLUMN_TYPES = new Set(["text", "integer", "real", "blob", "numeric"]);
 const VALID_RELATION_TYPES = new Set(["many_to_one"]);
@@ -152,10 +153,45 @@ export function validateSchema(input: unknown): ValidationIssue[] {
         }
       });
     }
+
+    if (def.indexes !== undefined) {
+      if (!Array.isArray(def.indexes)) {
+        issues.push({ path: `${path}.indexes`, message: "indexes must be an array" });
+      } else {
+        def.indexes.forEach((rawIndex: unknown, i: number) => {
+          const indexPath = `${path}.indexes[${i}]`;
+          if (typeof rawIndex !== "object" || rawIndex === null) {
+            issues.push({ path: indexPath, message: "index must be an object" });
+            return;
+          }
+          const index = rawIndex as Record<string, unknown>;
+          if (!Array.isArray(index.columns) || index.columns.length === 0) {
+            issues.push({ path: `${indexPath}.columns`, message: "columns must be a non-empty array" });
+          } else {
+            for (const col of index.columns) {
+              if (typeof col !== "string" || !columnNames.has(col)) {
+                issues.push({
+                  path: `${indexPath}.columns`,
+                  message: `column "${String(col)}" must exist in table "${table}"`,
+                });
+              }
+            }
+          }
+          if (index.unique !== undefined && typeof index.unique !== "boolean") {
+            issues.push({ path: `${indexPath}.unique`, message: "unique must be a boolean" });
+          }
+          if (index.name !== undefined && (typeof index.name !== "string" || !IDENT.test(index.name))) {
+            issues.push({ path: `${indexPath}.name`, message: "name must be a valid identifier" });
+          }
+        });
+      }
+    }
   }
 
-  // Second pass: referenced column must exist in the referenced table.
+  // Second pass: referenced column must exist in the referenced table,
+  // and resolved index names must be unique (SQLite has one global index namespace).
   const typed = input as DatabaseSchema;
+  const indexNames = new Map<string, string>();
   for (const [table, def] of Object.entries(typed)) {
     for (let i = 0; i < (def.relations ?? []).length; i++) {
       const rel = def.relations![i];
@@ -167,6 +203,20 @@ export function validateSchema(input: unknown): ValidationIssue[] {
           path: `${table}.relations[${i}].references.column`,
           message: `table "${rel.references.table}" has no column "${rel.references.column}"`,
         });
+      }
+    }
+    for (let i = 0; i < (def.indexes ?? []).length; i++) {
+      const index = def.indexes![i];
+      if (typeof index !== "object" || index === null || !Array.isArray(index.columns)) continue;
+      const name = resolveIndexName(table, index);
+      const firstSeen = indexNames.get(name);
+      if (firstSeen !== undefined) {
+        issues.push({
+          path: `${table}.indexes[${i}]`,
+          message: `duplicate index name "${name}" (also on "${firstSeen}")`,
+        });
+      } else {
+        indexNames.set(name, table);
       }
     }
   }
